@@ -1329,7 +1329,7 @@ public:
             coeff.z = coeffSel->points[i].x;
             coeff.intensity = coeffSel->points[i].intensity;
             // in camera
-            // TODO 无法理解这个表达式
+            // 距离对旋转的偏导，是在欧拉角转换公式里进行求导的
             float arx = (crx * sry * srz * pointOri.x + crx * crz * sry * pointOri.y - srx * sry * pointOri.z) * coeff.x + (-srx * srz * pointOri.x - crz * srx * pointOri.y - crx * pointOri.z) * coeff.y + (crx * cry * srz * pointOri.x + crx * cry * crz * pointOri.y - cry * srx * pointOri.z) * coeff.z;
 
             float ary = ((cry * srx * srz - crz * sry) * pointOri.x + (sry * srz + cry * crz * srx) * pointOri.y + crx * cry * pointOri.z) * coeff.x + ((-cry * crz - srx * sry * srz) * pointOri.x + (cry * srz - crz * srx * sry) * pointOri.y - crx * sry * pointOri.z) * coeff.z;
@@ -1351,27 +1351,29 @@ public:
         cv::transpose(matA, matAt);
         // 利用高斯牛顿法求解
         // 公式原型是：J^(T)*J * delta(x) = -J*f(x)
-        // J是雅可比矩阵，即A，f(x)是优化目标，即-B
         // 通过QR分解求解matAtA*matX = matAtB，得到解matX
         matAtA = matAt * matA;
         matAtB = matAt * matB;
         cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR);
-        // TODO检查近似Hessian矩阵（J^(T)J）是否退化（奇异），行列式=0
+        // 检查A^TA是否退化（奇异），行列式=0
+        // 对于使用G-N或L-M求解的优化问题来说，J可以视为是A的一阶近似
         if (iterCount == 0)
         {
 
             cv::Mat matE(1, 6, CV_32F, cv::Scalar::all(0));
             cv::Mat matV(6, 6, CV_32F, cv::Scalar::all(0));
             cv::Mat matV2(6, 6, CV_32F, cv::Scalar::all(0));
-
+        // matE为特征值，从大到小排列
             cv::eigen(matAtA, matE, matV);
             matV.copyTo(matV2);
 
             isDegenerate = false;
             float eignThre[6] = {100, 100, 100, 100, 100, 100};
+            // 从小到大开始检查
             for (int i = 5; i >= 0; i--)
             {
-                // 特征值大于100，则保持退化
+                // 特征值大于100，则保持退化，
+                // 论文《On Degeneracy of Optimization-based State Estimation Problems》里取200
                 if (matE.at<float>(0, i) < eignThre[i])
                 {
                     for (int j = 0; j < 6; j++)
@@ -1385,13 +1387,21 @@ public:
                     break;
                 }
             }
+            // 在论文里，对应 P=V_f^{-1} * V_u
             matP = matV.inv() * matV2;
         }
-        // TODO不理解
+        // 见于论文《On Degeneracy of Optimization-based State Estimation Problems》
         if (isDegenerate)
         {
             cv::Mat matX2(6, 1, CV_32F, cv::Scalar::all(0));
             matX.copyTo(matX2);
+            // x_f =V_f^{-1} * V_u * X_u
+            // 与论文里有出入，目前若某个维度退化了，则值在下一次迭代中仍保持不变（加了个0）。
+            // 由于优化时，是利用transformTobeMapped也就是估算的位姿直接将点云给投影到了世界坐标系里
+            // 因此，迭代初值就变成了0,这种做法在NDT_D2D里也有提到。
+            // 这样来看，之所以比论文里少了预测项，应该也是因为预测值是0
+            // 另外，本文实际上还是用到了guess的，因为transformTobeMapped在updateInitialGuess()函数里
+            // 被imu里程计给赋值了。
             matX = matP * matX2;
         }
         // 改变下一步迭代值
