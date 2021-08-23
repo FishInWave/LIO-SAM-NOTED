@@ -1142,6 +1142,7 @@ public:
                     // line_12，底边边长
                     float l12 = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2) + (z1 - z2) * (z1 - z2));
                     //两次叉积，得到点到直线的垂线段单位向量，x分量，下面同理
+                    // (la,lb,lc)=\frac{AB}{|AB|}\times\frac{OA\times OB}{|OA\times OB|}
                     float la = ((y1 - y2) * ((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) + (z1 - z2) * ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1))) / a012 / l12;
 
                     float lb = -((x1 - x2) * ((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) - (z1 - z2) * ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1))) / a012 / l12;
@@ -1330,6 +1331,8 @@ public:
             coeff.intensity = coeffSel->points[i].intensity;
             // in camera
             // 距离对旋转的偏导，是在欧拉角转换公式里进行求导的
+            // R由欧拉角得到。这样的R分别对x y z 求导后，得到了矩阵R'。
+            // \partial loss/ partial ex = (la,lb,lc)*R'*(px,py,pz)T;
             float arx = (crx * sry * srz * pointOri.x + crx * crz * sry * pointOri.y - srx * sry * pointOri.z) * coeff.x + (-srx * srz * pointOri.x - crz * srx * pointOri.y - crx * pointOri.z) * coeff.y + (crx * cry * srz * pointOri.x + crx * cry * crz * pointOri.y - cry * srx * pointOri.z) * coeff.z;
 
             float ary = ((cry * srx * srz - crz * sry) * pointOri.x + (sry * srz + cry * crz * srx) * pointOri.y + crx * cry * pointOri.z) * coeff.x + ((-cry * crz - srx * sry * srz) * pointOri.x + (cry * srz - crz * srx * sry) * pointOri.y - crx * sry * pointOri.z) * coeff.z;
@@ -1357,6 +1360,7 @@ public:
         cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR);
         // 检查A^TA是否退化（奇异），行列式=0
         // 对于使用G-N或L-M求解的优化问题来说，J可以视为是A的一阶近似
+        // 通过Jacobian的eigenvalue判断哪个分量的约束不足, 不更新那个方向上的迭代
         if (iterCount == 0)
         {
 
@@ -1372,7 +1376,7 @@ public:
             // 从小到大开始检查
             for (int i = 5; i >= 0; i--)
             {
-                // 特征值大于100，则保持退化，
+                // 特征值小于100，则认为退化，
                 // 论文《On Degeneracy of Optimization-based State Estimation Problems》里取200
                 if (matE.at<float>(0, i) < eignThre[i])
                 {
@@ -1388,6 +1392,7 @@ public:
                 }
             }
             // 在论文里，对应 P=V_f^{-1} * V_u
+            // 若不退化，则matP=I
             matP = matV.inv() * matV2;
         }
         // 见于论文《On Degeneracy of Optimization-based State Estimation Problems》
