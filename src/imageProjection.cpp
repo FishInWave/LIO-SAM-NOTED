@@ -350,7 +350,7 @@ public:
         }
 
         --imuPointerCur;
-
+        // 若只有一个imu直接返回。
         if (imuPointerCur <= 0)
             return;
 
