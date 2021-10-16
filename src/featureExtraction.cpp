@@ -220,7 +220,7 @@ public:
                         }
                     }
                 }
-
+// 剩余点全部当面点
                 for (int k = sp; k <= ep; k++)
                 {
                     if (cloudLabel[k] <= 0){
