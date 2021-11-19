@@ -314,7 +314,7 @@ public:
             // 3. 将1、2中的地点的关键帧里的角点和平面点添加到Local里
             // 4. Local降采样
             extractSurroundingKeyFrames();
-            // 提取当前帧的角点和边点，并进行降采样
+            //对当前帧的角点和边点进行降采样
             downsampleCurrentScan();
             // scan-to-map优化当前帧位姿
             // 1、要求当前帧特征点数量足够多，且匹配的点数够多，才执行优化

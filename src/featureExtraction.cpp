@@ -83,6 +83,8 @@ public:
         int cloudSize = extractedCloud->points.size();
         for (int i = 5; i < cloudSize - 5; i++)
         {
+            // 计算曲率的时候，他并没有考虑空档的存在，这其实不合适。
+            // 更合理的方式，或许是对每个点计算其与其前/后第五个点的列号差，若在10以内，则正常计算，否则直接进行下个点的判断。
             float diffRange = cloudInfo.pointRange[i-5] + cloudInfo.pointRange[i-4]
                             + cloudInfo.pointRange[i-3] + cloudInfo.pointRange[i-2]
                             + cloudInfo.pointRange[i-1] - cloudInfo.pointRange[i] * 10
@@ -203,7 +205,7 @@ public:
                         cloudNeighborPicked[ind] = 1;
 
                         for (int l = 1; l <= 5; l++) {
-
+// 列号差距太大，表示存在断档，就不必继续屏蔽邻域点了
                             int columnDiff = std::abs(int(cloudInfo.pointColInd[ind + l] - cloudInfo.pointColInd[ind + l - 1]));
                             if (columnDiff > 10)
                                 break;
